@@ -3,6 +3,9 @@ HR Management System — Enhanced Backend
 Indian Payroll (PF/ESI/TDS/80C/HRA), Form-16, Employee Docs, Validation
 """
 import sqlite3, os, hashlib, secrets, math
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from datetime import datetime
 from io import BytesIO
@@ -1482,8 +1485,8 @@ def get_stats():
         total  = db.execute("SELECT COUNT(*) as c FROM employees").fetchone()['c']
         active = db.execute("SELECT COUNT(*) as c FROM employees WHERE status='Active'").fetchone()['c']
         depts  = db.execute("SELECT department,COUNT(*) as c FROM employees WHERE status='Active' GROUP BY department").fetchall()
-        docs   = db.execute("SELECT COUNT(*) as c FROM generated_documents WHERE generated_at>date('now','-30 days')").fetchone()['c']
-        payroll= db.execute("SELECT SUM(gross_salary) as s FROM payslips WHERE strftime('%Y-%m',generated_at)=strftime('%Y-%m','now')").fetchone()['s'] or 0
+        docs   = db.execute("SELECT COUNT(*) as c FROM generated_documents WHERE generated_at > NOW() - INTERVAL '30 days'").fetchone()['c']
+        payroll= db.execute("SELECT SUM(gross_salary) as s FROM payslips WHERE TO_CHAR(generated_at, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')").fetchone()['s'] or 0
         return jsonify({'total_employees':total,'active_employees':active,
                         'departments':[dict(r) for r in depts],
                         'documents_this_month':docs, 'monthly_payroll':payroll})
