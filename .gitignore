@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.db
+hr_data.db
+static/uploads/
+static/emp_docs/
+.env
+.idea/
+.vscode/
+*.pyc
