@@ -16,8 +16,11 @@ app.secret_key = secrets.token_hex(32)
 DB_PATH    = os.path.join(os.path.dirname(__file__), 'hr_data.db')
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 EMP_DOCS   = os.path.join(os.path.dirname(__file__), 'static', 'emp_docs')
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(EMP_DOCS,   exist_ok=True)
+try:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs(EMP_DOCS,   exist_ok=True)
+except OSError:
+    pass # Vercel is Read-Only
 
 ALLOWED_IMG  = {'jpg','jpeg','png','gif','webp'}
 ALLOWED_DOCS = {'pdf','jpg','jpeg','png','doc','docx'}
@@ -250,7 +253,10 @@ def init_db():
         for col,td in [("cin","TEXT DEFAULT ''"),("tan","TEXT DEFAULT ''")]:
             _add_col("company", col, td)
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"Database initialization failed during startup: {e}")
 
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
 def hash_pw(p): return hashlib.sha256(p.encode()).hexdigest()
