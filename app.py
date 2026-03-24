@@ -13,6 +13,13 @@ from io import BytesIO
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = secrets.token_hex(32)
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    print(traceback.format_exc())
+    return jsonify({"error": f"Server Error: {str(e)}"}), 500
+
+
 DB_PATH    = os.path.join(os.path.dirname(__file__), 'hr_data.db')
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 EMP_DOCS   = os.path.join(os.path.dirname(__file__), 'static', 'emp_docs')
