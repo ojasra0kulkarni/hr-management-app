@@ -656,6 +656,9 @@ async function showEmpForm(id=null){
         <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;color:#92400e">
           ⚠️ <b>Indian Payroll Auto-Calculation:</b> PF = 12% of Basic (capped ₹15,000), ESI = 0.75% if Gross ≤ ₹21,000, PT = Maharashtra slab, TDS = New Tax Regime with ₹75,000 std deduction. Override any field to set manually.
         </div>
+        <div class="salary-grid" style="margin-bottom:14px; align-items: end;">
+          <div class="fg"><label style="font-weight:bold;color:var(--navy)">Annual CTC (₹) (Auto-calculates structure)</label><input id="ef-ctc" type="number" min="0" value="0" oninput="calcFromCTC()" placeholder="e.g. 600000"></div>
+        </div>
         <div class="sec-div">Earnings (Monthly ₹)</div>
         <div class="salary-grid">
           <div class="fg"><label>Basic Salary *</label><input id="ef-basic" type="number" min="0" value="${e.basic_salary||0}" oninput="autoCalcSalary()"><div class="err-msg"></div></div>
@@ -755,6 +758,23 @@ function empTab(name,btn){
   ['personal','employment','salary','bank','photo'].forEach(t=>{
     const el=$(`tab-${t}`);if(el){el.classList.toggle('hidden',t!==name)}
   });
+}
+
+function calcFromCTC(){
+  const ctc = parseFloat($('ef-ctc').value) || 0;
+  if(ctc <= 0) return;
+  const monthlyCTC = ctc / 12;
+  const basic = monthlyCTC * 0.50; // 50% of monthly CTC
+  const hra = basic * 0.50; // 50% of basic
+  const pf_employer = Math.min(basic, 15000) * 0.12; 
+  // Remaining goes to Special Allowance
+  const special = Math.max(0, monthlyCTC - (basic + hra + pf_employer));
+  
+  const setV=(id,v)=>{const e=$(id);if(e)e.value=Math.round(v)};
+  setV('ef-basic', basic); setV('ef-hra', hra); setV('ef-sa', special);
+  setV('ef-ta', 0); setV('ef-ma', 0); setV('ef-lta', 0); setV('ef-oa', 0);
+  setV('ef-pfe', pf_employer); setV('ef-pfr', pf_employer); // Empl and Empr PF
+  autoCalcSalary();
 }
 
 function autoCalcSalary(){
@@ -985,15 +1005,16 @@ async function showPayslipForm(){
           </select><div class="err-msg"></div>
         </div>
         <div class="fg"><label>Month *</label>
-          <select id="ps-month">${MONTHS.map((m,i)=>`<option value="${i+1}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('')}</select>
+          <select id="ps-month" onchange="updateMonthDays()">${MONTHS.map((m,i)=>`<option value="${i+1}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('')}</select>
         </div>
         <div class="fg"><label>Year *</label>
-          <select id="ps-year">${[2026,2025,2024,2023].map(y=>`<option ${y===now.getFullYear()?'selected':''}>${y}</option>`).join('')}</select>
+          <select id="ps-year" onchange="updateMonthDays()">${[2026,2025,2024,2023].map(y=>`<option ${y===now.getFullYear()?'selected':''}>${y}</option>`).join('')}</select>
         </div>
       </div>
       <div class="form-row">
-        <div class="fg"><label>Working Days</label><input id="ps-wd" type="number" value="26" min="1" max="31" oninput="updatePayroll()"></div>
-        <div class="fg"><label>Paid Days</label><input id="ps-pd" type="number" value="26" min="0" max="31" oninput="updatePayroll()"></div>
+        <div class="fg"><label>Working Days</label><input id="ps-wd" type="number" value="26" min="1" max="31" oninput="updatePayroll()" readonly style="background-color: var(--bg); pointer-events: none;"></div>
+        <div class="fg"><label>Loss of Pay (Days)</label><input id="ps-lop" type="number" value="0" min="0" max="31" oninput="updateMonthDays()"></div>
+        <div class="fg"><label>Paid Days</label><input id="ps-pd" type="number" value="26" min="0" max="31" oninput="updatePayroll()" readonly style="background-color: var(--bg); pointer-events: none;"></div>
         <div class="fg"><label>Metro City?</label>
           <select id="ps-metro" onchange="updatePayroll()"><option value="1">Yes (50% HRA exempt)</option><option value="0">No (40% HRA exempt)</option></select>
         </div>
@@ -1035,6 +1056,21 @@ async function showPayslipForm(){
       <button class="btn btn-primary" onclick="savePayslip()">💾 Save & Download</button>
     </div>
   </div>`);
+  setTimeout(()=>updateMonthDays(), 100);
+}
+
+function updateMonthDays() {
+  const m = parseInt($('ps-month')?.value);
+  const y = parseInt($('ps-year')?.value);
+  if (m && y) {
+    const days = new Date(y, m, 0).getDate();
+    const wd = $('ps-wd');
+    if(wd) wd.value = days;
+    const lop = parseFloat($('ps-lop')?.value) || 0;
+    const pd = $('ps-pd');
+    if(pd) pd.value = Math.max(0, days - lop);
+    updatePayroll();
+  }
 }
 
 async function loadEmpSalary(id){
