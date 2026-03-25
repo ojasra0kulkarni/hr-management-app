@@ -786,7 +786,7 @@ function autoCalcSalary(){
   const gross=earn.reduce((s,id)=>s+(parseFloat($(id)?.value)||0),0);
   const basic=parseFloat($('ef-basic')?.value)||0;
   const pf=Math.min(basic,15000)*0.12;
-  const est_ded=ded.reduce((s,id)=>{const v=parseFloat($(id)?.value)||0;return s+v},0)||pf+(gross<=21000?gross*0.0075:0)+(gross>=10000?200:gross>=7500?175:0);
+  const est_ded=ded.reduce((s,id)=>{const v=parseFloat($(id)?.value)||0;return s+v},0)||pf+(gross<=21000?gross*0.0075:0)+(gross>=7500?175:0);
   if($('prev-gross')){
     $('prev-gross').textContent=fmt(gross);
     $('prev-ded').textContent=fmt(est_ded);
