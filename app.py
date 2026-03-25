@@ -564,6 +564,97 @@ def create_employee():
         except Exception as e:
             return jsonify({'error':str(e)}), 400
 
+import csv, io
+import openpyxl
+
+@app.route('/api/employees/bulk/template', methods=['GET'])
+def bulk_template():
+    if not require_admin(request): return jsonify({'error':'Unauthorized'}), 403
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['emp_code', 'first_name', 'last_name', 'email', 'date_of_joining', 'department', 'designation', 'basic_salary', 'create_user'])
+    writer.writerow(['EMP999', 'John', 'Doe', 'john.doe@example.com', '2024-01-01', 'Engineering', 'Developer', '40000', 'Yes'])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode('utf-8')), mimetype='text/csv', download_name='employee_template.csv', as_attachment=True)
+
+@app.route('/api/employees/bulk', methods=['POST'])
+def bulk_upload():
+    if not require_admin(request): return jsonify({'error':'Unauthorized'}), 403
+    f = request.files.get('file')
+    if not f: return jsonify({'error':'No file uploaded'}), 400
+    ext = f.filename.rsplit('.',1)[-1].lower()
+    if ext not in ('csv', 'xlsx'): return jsonify({'error':'Only CSV or XLSX allowed'}), 400
+    
+    rows = []
+    try:
+        if ext == 'csv':
+            stream = io.StringIO(f.read().decode('utf-8'))
+            reader = csv.DictReader(stream)
+            rows = list(reader)
+        else:
+            wb = openpyxl.load_workbook(io.BytesIO(f.read()), data_only=True)
+            ws = wb.active
+            headers = [cell.value for cell in ws[1]]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not any(row): continue
+                rows.append(dict(zip(headers, row)))
+    except Exception as e:
+        return jsonify({'error': f'Failed to parse file: {str(e)}'}), 400
+
+    success_emps = 0
+    success_users = 0
+    errors = []
+    with get_db() as db:
+        for i, r in enumerate(rows, start=2):
+            emp_code = str(r.get('emp_code', '')).strip()
+            if emp_code == 'None': emp_code = ''
+            fname = str(r.get('first_name', '')).strip()
+            if fname == 'None': fname = ''
+            email = str(r.get('email', '')).strip()
+            if email == 'None': email = ''
+            doj = str(r.get('date_of_joining', '')).strip()
+            if doj == 'None': doj = ''
+            if not (emp_code and fname and email and doj):
+                errors.append(f"Row {i}: Missing required fields (emp_code, first_name, email, date_of_joining)")
+                continue
+            
+            ex = db.execute("SELECT id FROM employees WHERE emp_code=%s OR email=%s", (emp_code, email)).fetchone()
+            if ex:
+                errors.append(f"Row {i}: Employee code '{emp_code}' or email '{email}' already exists.")
+                continue
+
+            try: basic = float(r.get('basic_salary') or 0)
+            except: basic = 0
+            
+            create_u = str(r.get('create_user', '')).strip().lower() in ('yes', 'true', '1', 'y')
+            lname = str(r.get('last_name','')).strip()
+            if lname == 'None': lname = ''
+            dept = str(r.get('department','')).strip()
+            if dept == 'None': dept = ''
+            desig = str(r.get('designation','')).strip()
+            if desig == 'None': desig = ''
+
+            try:
+                cur = db.execute(
+                    "INSERT INTO employees (emp_code,first_name,last_name,email,date_of_joining,department,designation,basic_salary) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (emp_code, fname, lname, email, doj, dept, desig, basic)
+                )
+                success_emps += 1
+                emp_id = cur.lastrowid
+
+                if create_u:
+                    ux = db.execute("SELECT id FROM users WHERE username=%s", (emp_code,)).fetchone()
+                    if ux:
+                        errors.append(f"Row {i}: User '{emp_code}' already exists.")
+                    else:
+                        db.execute("INSERT INTO users(username,password_hash,role,employee_id) VALUES(%s,%s,%s,%s)",
+                                   (emp_code, hash_pw("welcome123"), 'employee', emp_id))
+                        success_users += 1
+            except Exception as e:
+                errors.append(f"Row {i}: DB Error - {str(e)}")
+    
+    return jsonify({'success': True, 'employees_created': success_emps, 'users_created': success_users, 'errors': errors})
+
 @app.route('/api/employees/<int:eid>', methods=['PUT'])
 def update_employee(eid):
     if not require_admin(request): return jsonify({'error':'Unauthorized'}), 403

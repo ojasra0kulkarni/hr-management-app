@@ -540,7 +540,10 @@ function renderEmpTable(emps){
   $('content').innerHTML=`
     <div class="page-hdr">
       <div><h1>Employees</h1><p>${emps.length} employee(s)</p></div>
-      <button class="btn btn-primary" onclick="showEmpForm()">+ Add Employee</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="showBulkImport()">📤 Bulk Import</button>
+        <button class="btn btn-primary" onclick="showEmpForm()">+ Add Employee</button>
+      </div>
     </div>
     <div class="filter-bar">
       <div class="search-wrap"><input type="text" placeholder="Search name, code, dept…" oninput="filterEmps(this.value)" style="width:270px"></div>
@@ -836,6 +839,76 @@ async function delEmp(id){
   if(!confirm('Delete this employee? All related records will remain.'))return;
   try{await api(`/api/employees/${id}`,{method:'DELETE'});toast('Deleted','s');renderEmployees()}
   catch(ex){toast(ex.message,'e')}
+}
+
+// ─── BULK EXCEL/CSV IMPORT ───────────────────────────────────────────────────
+function showBulkImport(){
+  modal(`<div class="modal">
+    <div class="modal-hdr"><h3>Bulk Import Employees</h3><button class="mc" onclick="this.closest('.modal-ov').remove()">✕</button></div>
+    <div class="modal-body">
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#0369a1">
+        💡 <b>How it works:</b> Download the template, fill in your employee details, and upload the file. If you set <b>create_user = Yes</b>, an account will be automatically generated (password: welcome123).
+      </div>
+      <div class="text-center" style="margin-bottom:16px">
+        <a href="/api/employees/bulk/template" target="_blank" class="btn btn-sm btn-outline">📥 Download Template (CSV)</a>
+      </div>
+      <div class="sec-div">Upload File (.csv, .xlsx)</div>
+      <div class="doc-drop" id="bulk-drop-zone">
+        <input type="file" id="bulk-file-inp" accept=".csv,.xlsx">
+        <div style="font-size:32px;margin-bottom:8px">📁</div>
+        <div style="font-weight:600;font-size:13.5px">Click or drag file here</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">CSV or Excel (Max 5MB)</div>
+        <div id="bulk-file-preview" style="margin-top:8px"></div>
+      </div>
+      <div id="bulk-result" class="mt-3" style="font-size:13px;max-height:150px;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-outline" onclick="this.closest('.modal-ov').remove()">Close</button>
+      <button class="btn btn-primary" id="btn-upload-bulk" onclick="uploadBulkFile()">🚀 Upload & Import</button>
+    </div>
+  </div>`);
+
+  const inp=$('bulk-file-inp');
+  inp.addEventListener('change',()=>{
+    const f=inp.files[0];
+    if(f)$('bulk-file-preview').innerHTML=`<span class="badge bg-blue">📎 ${f.name} · ${fmtSz(f.size)}</span>`;
+  });
+  const dz=$('bulk-drop-zone');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over')});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+  dz.addEventListener('drop',e=>{
+    e.preventDefault();dz.classList.remove('drag-over');
+    const f=e.dataTransfer.files[0];
+    if(f){
+      const dt=new DataTransfer();dt.items.add(f);inp.files=dt.files;
+      $('bulk-file-preview').innerHTML=`<span class="badge bg-blue">📎 ${f.name} · ${fmtSz(f.size)}</span>`;
+    }
+  });
+}
+
+async function uploadBulkFile(){
+  const f=$('bulk-file-inp').files[0];
+  if(!f){toast('Please select a file first','e');return}
+  $('btn-upload-bulk').disabled = true;
+  $('btn-upload-bulk').textContent = 'Uploading...';
+  $('bulk-result').innerHTML = '<div class="spin" style="margin:0 auto"></div>';
+  
+  try{
+    const r = await apiUp('/api/employees/bulk', f);
+    let html = `<div style="color:var(--green);font-weight:bold;margin-bottom:8px">✅ Success! Created ${r.employees_created} employees & ${r.users_created} users.</div>`;
+    if(r.errors && r.errors.length) {
+      html += `<div style="color:var(--red);font-weight:bold;margin-bottom:4px">⚠️ Errors (${r.errors.length}):</div><ul style="color:var(--red);padding-left:20px;margin:0">`;
+      r.errors.forEach(err => html += `<li>${err}</li>`);
+      html += `</ul>`;
+    }
+    $('bulk-result').innerHTML = html;
+    toast(`Import complete: ${r.employees_created} added.`,'s');
+    renderEmployees();
+  }catch(ex){
+    $('bulk-result').innerHTML = `<div style="color:var(--red);font-weight:bold">❌ Error: ${ex.message}</div>`;
+  }
+  $('btn-upload-bulk').disabled = false;
+  $('btn-upload-bulk').textContent = '🚀 Upload & Import';
 }
 
 // ─── EMPLOYEE DOCUMENTS ───────────────────────────────────────────────────────
