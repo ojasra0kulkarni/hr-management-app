@@ -273,7 +273,11 @@ def verify_token(req):
     if not tok: return None
     with get_db() as db:
         r = db.execute("SELECT * FROM users WHERE username=?", (tok,)).fetchone()
-        return dict(r) if r else None
+        if r:
+            d = dict(r)
+            d['role'] = d.get('role', 'employee').lower()
+            return d
+        return None
 
 def require_admin(req):
     u = verify_token(req)
@@ -427,6 +431,7 @@ def login():
                        (d['username'], hash_pw(d['password']))).fetchone()
         if not u: return jsonify({'error':'Invalid credentials'}), 401
         u = dict(u)
+        u['role'] = u.get('role', 'employee').lower()
         emp = None
         if u['employee_id']:
             r = db.execute("SELECT * FROM employees WHERE id=?", (u['employee_id'],)).fetchone()
@@ -447,7 +452,7 @@ def create_user():
     with get_db() as db:
         try:
             db.execute("INSERT INTO users(username,password_hash,role,employee_id) VALUES(?,?,?,?)",
-                       (d['username'], hash_pw(d['password']), d['role'], d.get('employee_id')))
+                       (d['username'], hash_pw(d['password']), d.get('role', 'employee').lower(), d.get('employee_id')))
             return jsonify({'success':True})
         except Exception as e:
             return jsonify({'error':str(e)}), 400
@@ -457,12 +462,13 @@ def update_user(uid):
     if not require_admin(request): return jsonify({'error':'Unauthorized'}), 403
     d = request.json
     with get_db() as db:
+        role = d.get('role', 'employee').lower()
         if d.get('password'):
             db.execute("UPDATE users SET role=?,employee_id=?,password_hash=? WHERE id=?",
-                       (d['role'],d.get('employee_id'),hash_pw(d['password']),uid))
+                       (role,d.get('employee_id'),hash_pw(d['password']),uid))
         else:
             db.execute("UPDATE users SET role=?,employee_id=? WHERE id=?",
-                       (d['role'],d.get('employee_id'),uid))
+                       (role,d.get('employee_id'),uid))
         return jsonify({'success':True})
 
 @app.route('/api/users/<int:uid>', methods=['DELETE'])

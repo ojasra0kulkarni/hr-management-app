@@ -1285,7 +1285,7 @@ function showUserForm(user,emps){
       <div class="fg"><label>Username *</label><input id="uf-un" value="${user?.username||''}"><div class="err-msg"></div></div>
       <div class="fg"><label>Password ${user?'(leave blank = unchanged)':' *'}</label><input id="uf-pw" type="password" placeholder="${user?'New password (optional)':'Min 6 chars'}"><div class="err-msg"></div></div>
       <div class="fg"><label>Role *</label>
-        <select id="uf-role">${['admin','hr','employee'].map(r=>`<option ${user?.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}</select>
+        <select id="uf-role">${['admin','hr','employee'].map(r=>`<option value="${r}" ${user?.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}</select>
       </div>
       <div class="fg"><label>Linked Employee</label>
         <select id="uf-emp"><option value="">None</option>
