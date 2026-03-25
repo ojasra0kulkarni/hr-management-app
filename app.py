@@ -569,7 +569,6 @@ import openpyxl
 
 @app.route('/api/employees/bulk/template', methods=['GET'])
 def bulk_template():
-    if not require_admin(request): return jsonify({'error':'Unauthorized'}), 403
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['emp_code', 'first_name', 'last_name', 'email', 'date_of_joining', 'department', 'designation', 'basic_salary', 'create_user'])
